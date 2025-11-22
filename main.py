@@ -1,161 +1,97 @@
-import threading
-import cv2
 from ultralytics import YOLO
+
+import cv2
+
 import time
-
-class Video:
-    def __init__(self, video_source="", save_video=False):
-
-        if save_video:
-            self.fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-            self.out = cv2.VideoWriter('output.mp4', self.fourcc, 25.0, (1920, 1080))
-
-        if video_source == "":
-            self.cap = cv2.VideoCapture(0)
-        else:
-            self.cap = cv2.VideoCapture(video_source)
-
-    def getFrame(self):
-        ret, frame = self.cap.read()
-        return ret, frame
-
-    def setVideoInfo(self, fps, width, height):
-        self.cap.set(cv2.CAP_PROP_FPS, fps)
-        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
-        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
-
-    def getVideoInfo(self):
-        fps = self.cap.get(cv2.CAP_PROP_FPS)
-        width = self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)
-        height = self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
-        length = self.cap.get(cv2.CAP_PROP_FRAME_COUNT)
-        if fps!=0:
-            length = length/fps
-        else:
-            length = 0
-        return {
-            "fps": fps,
-            "width": width,
-            "height": height,
-            "time": length,
-        }
-
-    def saveFrame(self, frame):
-        self.out.write(frame)
+import os
 
 
-    def showFrame(self, frame):
-        cv2.imshow("zavod", frame)
+#------------------------------------------------
+# нужен именно детект      VVVVVVVVVVVVV
+model = YOLO("yolo11n.pt", task='detect')
 
-    def releaseVideo(self):
-        self.cap.release()
-
-    def releaseSavedVideo(self):
-        self.out.release()
-
-class Detector:
-    def __init__(self):
-        self.model = YOLO("yolov8x.pt") # yolov8x.pt 200+sec
-    def detectPeople(self, frame):
-        results = self.model(frame, verbose=False)
-        people = []
-        for result in results:
-            boxes = result.boxes
-            for box in boxes:
-                if int(box.cls[0]) == 0:
-                    x1, y1, x2, y2 = box.xyxy[0].tolist()
-                    confidence = float(box.conf[0])
-                    person_info = {"bbox": [int(x1), int(y1), int(x2), int(y2)],
-                                   "confidence": confidence}
-                    people.append(person_info)
-        return people
-    def drawBoxes(self, frame, people):
-        for person in people:
-            x1, y1, x2, y2 = person["bbox"]
-            conf = person["confidence"]
-            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-            conf = int(conf*100)
-            label = f"Person {conf}%"
-            cv2.putText(frame,label, (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-        return frame
-
-class Stopwatch:
-    def __init__(self):
-        self.start_time = 0
-        self.elapsed_time = 0
-        self.is_running = False
-        self.thread = None
-
-    def start(self):
-        if not self.is_running:
-            self.start_time = time.time() - self.elapsed_time
-            self.is_running = True
-            self.thread = threading.Thread(target=self._run)
-            self.thread.start()
-
-    def stop(self):
-        if self.is_running:
-            self.is_running = False
-            self.elapsed_time = time.time() - self.start_time
-            self.thread.join()
-
-    def reset(self):
-        self.elapsed_time = 0
-        self.is_running = False
-        self.start_time = 0
-
-    def get_time(self):
-        if self.is_running:
-            return time.time() - self.start_time
-        else:
-            return self.elapsed_time
-
-    def _run(self):
-        while self.is_running:
-            time.sleep(0.1)
+# Недо-бенчмаркинг
+start_time = time.time()
 
 
+# специально делаю промежуточный видос
+# c оптимизациями и именно его NN анализирует
+input_video = "zov.mp4"
+temp_video = "temp_processed_video.mp4"
 
-sourceChange = input("change source? (y/skip)")
-if sourceChange == "y":
-    source = r"".join(input("file source:"))
-else:
-    source = r"D:\Program Files\PyCharm\PythonProjects\Factory1984\456315_Laundry_Wash_1920x1080.mp4"
+#------------------------------------------------
+
+cap = cv2.VideoCapture(input_video)
+
+fps = cap.get(cv2.CAP_PROP_FPS)
+width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+
+fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+# я тут уменьшаю до 20 т.к знаю что исходный видос 60, по сути
+# надо сделать это статическим параметром типа reduced_fps = fps / 3
+out = cv2.VideoWriter(temp_video, fourcc, 20, (width, 640)) 
 
 
-vid = Video(source, True)
-detector = Detector()
-vidStopWatch = Stopwatch()
-
-paramsChange = input("change resolution? (y/skip)")
-if paramsChange == "y":
-    vidParams = input("video parameters (or press ENTER for 20FPS 1280x720):")
-    if vidParams != "":
-        fps, width, height = list(map(int,vidParams.split(" ")))
-    else:
-        fps, width, height = 20, 1280, 720
-    vid.setVideoInfo(fps, width, height)
-
-print(vid.getVideoInfo())
+# тут недо-оптимизации видоса, пока что тупо скип кадров
+processed_frames_count = 0
+original_frames_count = 0
 
 while True:
-    vidStopWatch.start()
-    ret,frame = vid.getFrame()
-    frame = detector.drawBoxes(frame, detector.detectPeople(frame))
-    if not(ret):
-        vid.releaseVideo()
-        vid.releaseSavedVideo()
-        cv2.destroyAllWindows()
-        vidStopWatch.stop()
-        print("time: ",vidStopWatch.get_time())
+    ret, frame = cap.read()
+    if not ret:
         break
-    vid.showFrame(frame)
-    vid.saveFrame(frame)
+    
+    original_frames_count += 1
+    
+    if original_frames_count % 3 == 0 or original_frames_count % 2 == 0:
+        continue
+    
+    # разрешение yf Native_widthx640
+    resized_frame = cv2.resize(frame, (width, 640))
+    
+    out.write(resized_frame)
+    processed_frames_count += 1
 
-    if cv2.waitKey(1) & 0xFF == ord(' '):
-        vid.releaseVideo()
-        cv2.destroyAllWindows()
-        vidStopWatch.stop()
-        break
+cap.release()
+out.release()
+
+total_people_detected = 0
+frame_count = 0
+
+results = model.predict(
+    source=temp_video,
+    classes=[0],
+    save=False, # это менять
+    show=True, # и это, остальное не менять
+    verbose=False,
+    stream=True
+)
+
+for frame_idx, result in enumerate(results):
+    frame_count += 1
+    boxes = result.boxes
+    if boxes is not None:
+        people_in_frame = len(boxes)
+        total_people_detected += people_in_frame
+        print(f"Кадр {frame_idx + 1} | {people_in_frame} человек")
+    else:
+        print(f"Кадр {frame_idx + 1} | 0")
 
 
+
+
+# очистка этого времнного видоса
+if os.path.exists(temp_video):
+    os.remove(temp_video)
+
+end_time = time.time()
+execution_time = end_time - start_time
+
+print(f"Время выполнения: {execution_time:.2f} секунд")
+print(f"Исходных кадров: {original_frames_count}")
+print(f"Обработанных кадров: {processed_frames_count}")
+print(f"Пропущено кадров: {original_frames_count - processed_frames_count}")
+print(f"Общее количество обнаружений людей: {total_people_detected}")
+print(f"Скорость обработки: {processed_frames_count/execution_time:.2f} кадров/секунду")
