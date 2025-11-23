@@ -1,2 +1,2 @@
-/output.mp4
-/yolov8x.pt
+__pycache__/
+*.pyc
