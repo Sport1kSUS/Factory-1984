@@ -1,14 +1,13 @@
-from kivy.uix.boxlayout import BoxLayout
-from kivy.uix.floatlayout import FloatLayout
-from kivy.uix.label import Label
-from kivy.uix.button import Button
-from kivy.properties import StringProperty
-from kivy.core.window import Window
-
 import os
 
+from kivy.core.window import Window
+from kivy.properties import StringProperty
+from kivy.uix.boxlayout import BoxLayout
+from kivy.uix.button import Button
+from kivy.uix.floatlayout import FloatLayout
+from kivy.uix.label import Label
 
-ascii_frame = r"""
+ASCII_FRAME = r"""
 ┌─Factory1984────────────────────────────────────────────────────────────────────────┐
 │                                                                                    │
 │                                                                                    │
@@ -36,8 +35,9 @@ ascii_frame = r"""
 │                                                            |,4-  ) )-,_. ,\ (  `'-'│
 │                                                           '---''(_/--'  `-'\_)     │
 └────────────────────────────────────────────────────────────────────────────────────┘
-        """
-ascii_button = """┌──────────────┐\n│ browse files │\n└──────────────┘"""
+"""
+
+ASCII_BUTTON = "┌──────────────┐\n│ browse files │\n└──────────────┘"
 
 
 class StartScreen(BoxLayout):
@@ -48,18 +48,18 @@ class StartScreen(BoxLayout):
         self.orientation = "vertical"
 
         label = Label(
-            text=ascii_frame,
+            text=ASCII_FRAME,
             font_size=20,
-            font_name="DejaVuSansMono",
+            font_name="DejaVu",
             size_hint=(1, 1),
             color=(0.8, 0.816, 0.855, 1),
             markup=True,
         )
 
         button = Button(
-            text=ascii_button,
+            text=ASCII_BUTTON,
             font_size=20,
-            font_name="DejaVuSansMono",
+            font_name="DejaVu",
             size_hint=(None, None),
             size=(200, 60),
             pos_hint={"center_x": 0.5, "center_y": 0.5},
